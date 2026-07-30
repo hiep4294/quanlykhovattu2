@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>KODSDOOR VIỆT NAM – Quản lý kho, hình ảnh và giá trị tồn</title>
+  <link rel="icon" type="image/png" href="/favicon.png?v=5.3">
+  <link rel="preload" href="/logo-kodsdoor.png?v=5.3" as="image">
+  <link rel="stylesheet" href="/styles.css?v=5.2">
+</head>
+<body>
+  <div id="loginView" class="login-view">
+    <form id="loginForm" class="login-card">
+      <div class="login-brand-wrap">
+        <img class="login-logo" src="/logo-kodsdoor.png?v=5.3" alt="KODSDOOR logo">
+      </div>
+      <div class="login-company-name">CÔNG TY CỔ PHẦN KODSDOOR VIỆT NAM</div>
+      <h1>HỆ THỐNG QUẢN LÝ KHO</h1>
+      <p>Dữ liệu tập trung · nhiều người dùng · cập nhật thời gian thực</p>
+      <label>Tên đăng nhập<input id="loginUser" autocomplete="username" required autofocus></label>
+      <label>Mật khẩu<input id="loginPassword" type="password" autocomplete="current-password" required></label>
+      <button class="btn primary full" type="submit">Đăng nhập</button>
+      <div id="loginError" class="form-error"></div>
+    </form>
+  </div>
+
+  <div id="appView" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand">
+        <img class="sidebar-logo" src="/logo-kodsdoor.png?v=5.3" alt="KODSDOOR logo">
+        <div><strong>HỆ THỐNG QUẢN LÝ KHO</strong><span id="companyShort">KODSDOOR</span></div>
+      </div>
+      <nav id="nav">
+        <button data-page="dashboard" class="active">Tổng quan</button>
+        <button data-page="inventory">Tồn kho</button>
+        <button data-page="values">Giá trị</button>
+        <button data-page="vouchers">Phiếu nhập xuất</button>
+        <button data-page="voucher-edit" data-write>Thêm phiếu</button>
+        <button data-page="partners">Đối tác</button>
+        <button data-page="ledger">Sổ kho</button>
+        <button data-page="report">Báo cáo N-X-T</button>
+        <button data-page="users" data-admin>Người dùng</button>
+        <button data-page="settings" data-admin>Cài đặt</button>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="sync-line"><span id="syncText">Chưa đồng bộ</span><button id="refreshBtn" class="link-btn">Làm mới</button></div>
+        <div id="lanAccess" class="lan-access hidden">
+          <span>Địa chỉ máy trạm</span>
+          <a id="accessAddress" href="#" target="_blank" rel="noopener"></a>
+          <button id="copyAccessBtn" class="link-btn" type="button">Sao chép</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="menuBtn" class="icon-btn">☰</button>
+        <div class="topbar-title-wrap"><h2 id="pageTitle">Tổng quan</h2><div id="pageSubtitle" class="muted"></div></div>
+        <div class="topbar-company">
+          <strong id="topCompanyName">CÔNG TY CỔ PHẦN KODSDOOR VIỆT NAM</strong>
+          <small>Kho công ty · Hà Nội</small>
+        </div>
+        <div class="top-actions">
+          <button id="quickVoucherBtn" class="btn primary" data-write>+ Phiếu mới</button>
+          <div class="user-menu">
+            <button id="userMenuBtn" class="user-button"><span id="userInitial">U</span><div><strong id="userName"></strong><small id="userRole"></small></div></button>
+            <div id="userDropdown" class="dropdown hidden">
+              <button id="changePasswordBtn">Đổi mật khẩu</button>
+              <button id="logoutBtn">Đăng xuất</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section id="page-dashboard" class="page active">
+        <div id="kpis" class="kpi-grid"></div>
+        <div class="grid-2">
+          <div class="card"><div class="card-head"><h3>Cảnh báo tồn kho</h3><button class="link-btn" data-page="inventory">Xem toàn bộ</button></div><div id="stockAlerts"></div></div>
+          <div class="card"><div class="card-head"><h3>Phiếu gần đây</h3><button class="link-btn" data-page="vouchers">Xem toàn bộ</button></div><div id="recentVouchers"></div></div>
+        </div>
+        <div class="card"><div class="card-head"><h3>Xuất nhập theo tháng</h3></div><div id="monthlySummary" class="chart-bars"></div></div>
+      </section>
+
+      <section id="page-inventory" class="page">
+        <div class="toolbar">
+          <input id="itemSearch" class="search" placeholder="Tìm mã hoặc tên vật tư">
+          <select id="itemCategory"><option value="">Tất cả nhóm hàng</option></select>
+          <select id="itemType"><option value="">Tất cả loại hàng</option></select>
+          <select id="itemStock"><option value="">Tất cả trạng thái</option><option value="negative">Tồn âm</option><option value="low">Sắp hết</option><option value="available">Còn hàng</option></select>
+          <button id="addItemBtn" class="btn primary" data-write>+ Vật tư</button>
+          <button id="exportInventoryBtn" class="btn">Xuất CSV</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>STT</th><th>Hình ảnh</th><th>Nhóm vật tư</th><th>Loại vật tư</th><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th class="num">Tồn đầu</th><th class="num">Nhập</th><th class="num">Xuất</th><th class="num">Tồn hiện tại</th><th class="num">Tồn tối thiểu</th><th data-write></th></tr></thead><tbody id="inventoryBody"></tbody></table></div>
+      </section>
+
+      <section id="page-values" class="page">
+        <div class="toolbar">
+          <input id="valueSearch" class="search" placeholder="Tìm mã hoặc tên vật tư">
+          <select id="valueCategory"><option value="">Tất cả nhóm hàng</option></select>
+          <select id="valueItemType"><option value="">Tất cả loại hàng</option></select>
+          <select id="valueStatus"><option value="">Tất cả vật tư</option><option value="priced">Đã nhập đơn giá</option><option value="missing">Chưa nhập đơn giá</option><option value="stock">Đang có tồn</option></select>
+          <button id="saveValuesBtn" class="btn primary" data-write>Lưu đơn giá</button>
+          <button id="exportValuesBtn" class="btn">Xuất CSV</button>
+        </div>
+        <div id="valueTotals" class="info-strip"></div>
+        <div class="value-note">Nhập <strong>đơn giá hiện tại</strong> cho từng vật tư. Giá trị tồn = Tồn hiện tại × Đơn giá.</div>
+        <div class="table-wrap"><table><thead><tr><th>STT</th><th>Nhóm vật tư</th><th>Loại vật tư</th><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th class="num">Tồn hiện tại</th><th class="num">Đơn giá (VNĐ)</th><th class="num">Giá trị tồn (VNĐ)</th></tr></thead><tbody id="valuesBody"></tbody></table></div>
+      </section>
+
+      <section id="page-vouchers" class="page">
+        <div class="toolbar">
+          <input id="voucherSearch" class="search" placeholder="Tìm số phiếu, đối tác, nội dung">
+          <select id="voucherType"><option value="">Tất cả loại</option><option value="IN">Phiếu nhập</option><option value="OUT">Phiếu xuất</option></select>
+          <select id="voucherPartner" class="partner-filter"><option value="">Tất cả công trình/đối tác</option></select>
+          <input id="voucherFrom" type="date"><input id="voucherTo" type="date">
+          <button class="btn primary" data-page="voucher-edit" data-write>+ Phiếu mới</button>
+          <button id="exportVouchersBtn" class="btn">Xuất CSV</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Số phiếu</th><th>Loại</th><th>Đối tác/Bộ phận</th><th>Diễn giải</th><th class="num">Số dòng</th><th>Người lập</th><th></th></tr></thead><tbody id="vouchersBody"></tbody></table></div>
+      </section>
+
+      <section id="page-voucher-edit" class="page">
+        <form id="voucherForm" class="form-card">
+          <div class="section-title"><div><h3 id="voucherFormTitle">Lập phiếu nhập/xuất</h3><p>Phiếu được lưu vào cơ sở dữ liệu chung ngay sau khi bấm Lưu.</p></div><span id="voucherModeBadge" class="badge out">PHIẾU XUẤT</span></div>
+          <input id="editVoucherId" type="hidden">
+          <div class="form-grid cols-4">
+            <label>Loại phiếu<select id="formVoucherType"><option value="OUT">Phiếu xuất kho</option><option value="IN">Phiếu nhập kho</option></select></label>
+            <label>Ngày phiếu<input id="formVoucherDate" type="date" required></label>
+            <label>Số phiếu<input id="formVoucherNumber" placeholder="Để trống để tự tạo"></label>
+            <label>Số hóa đơn<input id="formInvoiceNo"></label>
+            <label class="span-2">Đối tác/Bộ phận<select id="formPartner"></select></label>
+            <label class="span-2">Địa chỉ<input id="formAddress"></label>
+            <label class="span-4">Diễn giải<input id="formDescription" required placeholder="Nhập lý do nhập/xuất hoặc tên dự án"></label>
+            <label>Kho<input id="formWarehouse"></label>
+            <label>Người giao/nhận<input id="formDeliverer"></label>
+            <label>Thủ kho<input id="formStorekeeper"></label>
+            <label>Người duyệt<input id="formApprover"></label>
+          </div>
+          <div class="line-head"><h3>Danh sách vật tư</h3><button id="addVoucherLineBtn" type="button" class="btn">+ Thêm dòng</button></div>
+          <div class="table-wrap"><table class="line-table"><thead><tr><th>STT</th><th>Nhóm vật tư</th><th>Loại vật tư</th><th>Vật tư</th><th>Ảnh</th><th>ĐVT</th><th class="num">Tồn hiện tại</th><th class="num">Số lượng</th><th>Tình trạng</th><th>Ghi chú</th><th></th></tr></thead><tbody id="voucherLinesBody"></tbody></table></div>
+          <div id="voucherWarning" class="warning hidden"></div>
+          <label>Ghi chú chung<textarea id="formVoucherNote" rows="2"></textarea></label>
+          <div class="form-actions"><button type="button" id="cancelVoucherBtn" class="btn">Hủy</button><button type="submit" class="btn primary">Lưu phiếu</button><button type="button" id="savePrintVoucherBtn" class="btn success">Lưu và in</button></div>
+        </form>
+      </section>
+
+      <section id="page-partners" class="page">
+        <div class="toolbar"><input id="partnerSearch" class="search" placeholder="Tìm mã hoặc tên đối tác"><button id="addPartnerBtn" class="btn primary" data-write>+ Đối tác</button><button id="exportPartnersBtn" class="btn">Xuất CSV</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Mã</th><th>Tên đối tác/Bộ phận</th><th>Địa chỉ</th><th>Mã số thuế</th><th>Ghi chú</th><th data-write></th></tr></thead><tbody id="partnersBody"></tbody></table></div>
+      </section>
+
+      <section id="page-ledger" class="page">
+        <div class="toolbar"><select id="ledgerItem" class="wide"></select><input id="ledgerFrom" type="date"><input id="ledgerTo" type="date"><button id="printLedgerBtn" class="btn">In sổ kho</button><button id="exportLedgerBtn" class="btn">Xuất CSV</button></div>
+        <div id="ledgerInfo" class="info-strip"></div>
+        <div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Số phiếu</th><th>Diễn giải</th><th class="num">Nhập</th><th class="num">Xuất</th><th class="num">Tồn</th><th>Ghi chú</th></tr></thead><tbody id="ledgerBody"></tbody></table></div>
+      </section>
+
+      <section id="page-report" class="page">
+        <div class="toolbar"><input id="reportFrom" type="date"><input id="reportTo" type="date"><select id="reportCategory"><option value="">Tất cả nhóm hàng</option></select><select id="reportItemType"><option value="">Tất cả loại hàng</option></select><select id="reportPartner" class="partner-filter"><option value="">Tất cả công trình/đối tác</option></select><button id="runReportBtn" class="btn primary">Tính báo cáo</button><button id="printReportBtn" class="btn">In báo cáo</button><button id="exportReportBtn" class="btn">Xuất CSV</button></div>
+        <div id="reportTotals" class="info-strip"></div>
+        <div class="table-wrap"><table><thead><tr><th>STT</th><th>Nhóm vật tư</th><th>Loại vật tư</th><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th id="reportOpeningHeader" class="num">Tồn đầu kỳ</th><th class="num">Nhập</th><th class="num">Xuất</th><th id="reportClosingHeader" class="num">Tồn cuối kỳ</th></tr></thead><tbody id="reportBody"></tbody></table></div>
+      </section>
+
+      <section id="page-users" class="page">
+        <div class="toolbar"><button id="addUserBtn" class="btn primary">+ Người dùng</button><button id="auditBtn" class="btn">Xem nhật ký thao tác</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Quyền</th><th>Trạng thái</th><th>Cập nhật</th><th></th></tr></thead><tbody id="usersBody"></tbody></table></div>
+        <div id="auditPanel" class="card hidden"><div class="card-head"><h3>Nhật ký thao tác gần nhất</h3></div><div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Tài khoản</th><th>Thao tác</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody id="auditBody"></tbody></table></div></div>
+      </section>
+
+      <section id="page-settings" class="page">
+        <form id="settingsForm" class="form-card narrow">
+          <h3>Thông tin doanh nghiệp</h3>
+          <label>Tên doanh nghiệp<input id="settingCompanyName"></label>
+          <label>Địa chỉ<input id="settingCompanyAddress"></label>
+          <label>Mã số thuế<input id="settingTaxCode"></label>
+          <h3>Thiết lập kho</h3>
+          <label>Kho mặc định<input id="settingWarehouse"></label>
+          <label class="check"><input id="settingAllowNegative" type="checkbox"> Cho phép lưu phiếu xuất làm tồn kho âm</label>
+          <div class="form-actions"><button type="submit" class="btn primary">Lưu cài đặt</button></div>
+        </form>
+        <div class="form-card narrow">
+          <h3>Sao lưu và phục hồi</h3>
+          <p class="muted">Sao lưu JSON dùng cho dữ liệu kho. Để sao lưu cả ảnh, chạy file SAO_LUU_DU_LIEU_VA_ANH.bat trên máy chủ.</p>
+          <div class="form-actions left"><button id="backupBtn" class="btn">Tải bản sao lưu</button><label class="btn danger file-btn">Phục hồi dữ liệu<input id="restoreFile" type="file" accept="application/json"></label></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="modal" class="modal hidden"><div class="modal-backdrop" data-close-modal></div><div class="modal-box"><button class="modal-close" data-close-modal>×</button><div id="modalContent"></div></div></div>
+  <div id="toast" class="toast hidden"></div>
+  <script src="/app.js?v=5.2"></script>
+</body>
+</html>

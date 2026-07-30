@@ -1,0 +1,4 @@
+ADMIN_PASSWORD=doi-mat-khau-quan-tri
+KEEPER_PASSWORD=doi-mat-khau-thu-kho
+VIEWER_PASSWORD=doi-mat-khau-chi-xem
+SESSION_SECRET=chuoi-ngau-nhien-toi-thieu-32-ky-tu
