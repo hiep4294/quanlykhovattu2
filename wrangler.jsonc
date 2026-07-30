@@ -17,11 +17,6 @@
       "migrations_dir": "migrations"
     }
   ],
-  "r2_buckets": [
-    {
-      "binding": "IMAGES"
-    }
-  ],
   "vars": {
     "SESSION_DAYS": "7"
   },

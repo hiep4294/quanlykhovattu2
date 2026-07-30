@@ -47,7 +47,30 @@ function canonicalCatalogValue(value,values){const cleaned=cleanCatalogValue(val
 function dataListOptions(values){return values.map(v=>`<option value="${h(v)}"></option>`).join('')}
 function imageThumb(item,extra=''){if(item?.imageUrl)return `<button type="button" class="image-button ${extra}" data-view-image="${h(item.imageUrl)}" data-image-title="${h(item.code||'')} — ${h(item.name||'vật tư')}" title="Xem ảnh ${h(item.name||'vật tư')}"><img src="${h(item.imageUrl)}" alt="${h(item.name||'Ảnh vật tư')}" loading="lazy"></button>`;return `<span class="image-placeholder ${extra}" title="Chưa có ảnh">Chưa có ảnh</span>`}
 function readFileAsDataUrl(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||''));r.onerror=()=>reject(new Error('Không đọc được tệp ảnh'));r.readAsDataURL(file)})}
-async function prepareImage(file){if(!file||!/^image\/(jpeg|png|webp)$/i.test(file.type))throw new Error('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP');if(file.size>10*1024*1024)throw new Error('Ảnh gốc phải nhỏ hơn 10 MB');const source=await readFileAsDataUrl(file);const img=await new Promise((resolve,reject)=>{const x=new Image();x.onload=()=>resolve(x);x.onerror=()=>reject(new Error('Ảnh bị lỗi hoặc không đọc được'));x.src=source});const max=1200,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.max(1,Math.round(img.naturalWidth*scale)),hh=Math.max(1,Math.round(img.naturalHeight*scale)),canvas=document.createElement('canvas');canvas.width=w;canvas.height=hh;const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,w,hh);ctx.drawImage(img,0,0,w,hh);return canvas.toDataURL('image/jpeg',.84)}
+function canvasToBlob(canvas,type,quality){return new Promise(resolve=>canvas.toBlob(resolve,type,quality))}
+async function prepareImage(file){
+  if(!file||!/^image\/(jpeg|png|webp)$/i.test(file.type))throw new Error('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP');
+  if(file.size>10*1024*1024)throw new Error('Ảnh gốc phải nhỏ hơn 10 MB');
+  const source=await readFileAsDataUrl(file);
+  const img=await new Promise((resolve,reject)=>{const x=new Image();x.onload=()=>resolve(x);x.onerror=()=>reject(new Error('Ảnh bị lỗi hoặc không đọc được'));x.src=source});
+  const limit=300*1024;
+  let maxSide=1200,quality=.82;
+  for(let attempt=0;attempt<12;attempt++){
+    const scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
+    const w=Math.max(1,Math.round(img.naturalWidth*scale));
+    const hh=Math.max(1,Math.round(img.naturalHeight*scale));
+    const canvas=document.createElement('canvas');
+    canvas.width=w;canvas.height=hh;
+    const ctx=canvas.getContext('2d');
+    if(!ctx)throw new Error('Trình duyệt không hỗ trợ xử lý ảnh');
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,w,hh);ctx.drawImage(img,0,0,w,hh);
+    const blob=await canvasToBlob(canvas,'image/webp',quality);
+    if(blob&&blob.type==='image/webp'&&blob.size<=limit)return readFileAsDataUrl(blob);
+    if(quality>.54)quality=Math.max(.54,quality-.07);
+    else{maxSide=Math.max(420,Math.round(maxSide*.8));quality=.70}
+  }
+  throw new Error('Không thể nén ảnh xuống dưới 300 KB. Hãy chọn ảnh nhỏ hơn.');
+}
 async function uploadItemImage(itemId,file){const dataUrl=await prepareImage(file);await api('/api/items/'+encodeURIComponent(itemId)+'/image',{method:'POST',body:JSON.stringify({dataUrl,filename:file.name})})}
 
 function updateTypeFilter(groupId,typeId,placeholder='Tất cả loại hàng'){const g=$(groupId)?.value||'',el=$(typeId);if(!el)return;const old=el.value;el.innerHTML=selectOptions(typeValues(g),placeholder,old);if(old&&!typeValues(g).includes(old))el.value=''}
@@ -76,7 +99,7 @@ function itemModal(id=''){
   openModal(`<h3>${id?'Sửa':'Thêm'} vật tư</h3><form id="itemModalForm">
     <div class="catalog-create-note"><strong>Nhóm và loại vật tư:</strong> chọn trong danh sách có sẵn hoặc chọn mục <b>+ Tạo mới</b> ở cuối danh sách.</div>
     <div class="form-grid cols-4">
-      <div class="span-4 item-image-editor"><div class="item-image-preview-wrap">${x.imageUrl?`<img id="itemImagePreview" src="${h(x.imageUrl)}" alt="Ảnh vật tư">`:`<div id="itemImageEmpty" class="item-image-empty">Chưa có ảnh vật tư</div><img id="itemImagePreview" class="hidden" alt="Ảnh vật tư">`}</div><div class="item-image-controls"><strong>Ảnh minh họa vật tư (không bắt buộc)</strong><span>JPG, PNG hoặc WebP. Phần mềm tự thu nhỏ ảnh để tải nhanh.</span><label class="btn file-select-btn">Chọn ảnh<input id="itemImageInput" type="file" accept="image/jpeg,image/png,image/webp"></label>${x.imageUrl?'<button id="removeItemImageBtn" type="button" class="btn danger">Xóa ảnh hiện tại</button>':''}</div></div>
+      <div class="span-4 item-image-editor"><div class="item-image-preview-wrap">${x.imageUrl?`<img id="itemImagePreview" src="${h(x.imageUrl)}" alt="Ảnh vật tư">`:`<div id="itemImageEmpty" class="item-image-empty">Chưa có ảnh vật tư</div><img id="itemImagePreview" class="hidden" alt="Ảnh vật tư">`}</div><div class="item-image-controls"><strong>Ảnh minh họa vật tư (không bắt buộc)</strong><span>JPG, PNG hoặc WebP. Phần mềm tự nén thành WebP dưới 300 KB.</span><label class="btn file-select-btn">Chọn ảnh<input id="itemImageInput" type="file" accept="image/jpeg,image/png,image/webp"></label>${x.imageUrl?'<button id="removeItemImageBtn" type="button" class="btn danger">Xóa ảnh hiện tại</button>':''}</div></div>
       <label class="span-2">Mã vật tư<input name="code" value="${h(x.code)}" required></label>
       <label class="span-2">Tên vật tư<input name="name" value="${h(x.name)}" required></label>
       <label class="span-2">Nhóm vật tư

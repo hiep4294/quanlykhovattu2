@@ -1,5 +1,5 @@
 const MAX_BODY_BYTES = 12 * 1024 * 1024;
-const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 300 * 1024;
 const PBKDF2_ITERATIONS = 260_000;
 const SESSION_COOKIE = "kho_session";
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
@@ -671,12 +671,12 @@ async function apiItems(request, env, method, itemId) {
     );
     if (!item) throw new ApiError(404, "Không tìm thấy vật tư");
     await env.DB.batch([
+      env.DB.prepare(
+        "DELETE FROM item_images WHERE item_id=? OR image_key=?",
+      ).bind(itemId, item.image_file || ""),
       env.DB.prepare("DELETE FROM items WHERE id=?").bind(itemId),
       auditStatement(env.DB, user, "DELETE", "item", itemId, item.code),
     ]);
-    if (item.image_file && env.IMAGES) {
-      await env.IMAGES.delete(item.image_file);
-    }
     return jsonResponse({ ok: true });
   }
   throw new ApiError(405, "Phương thức không được hỗ trợ");
@@ -730,7 +730,7 @@ function decodeBase64Image(dataUrl) {
     throw new ApiError(400, "Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP");
   }
   if (encoded.length > Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 8) {
-    throw new ApiError(400, "Ảnh sau khi xử lý phải nhỏ hơn 3 MB");
+    throw new ApiError(400, "Ảnh sau khi xử lý phải không quá 300 KB");
   }
   let bytes;
   try {
@@ -741,7 +741,7 @@ function decodeBase64Image(dataUrl) {
     throw new ApiError(400, "Không đọc được dữ liệu ảnh");
   }
   if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) {
-    throw new ApiError(400, "Ảnh sau khi xử lý phải nhỏ hơn 3 MB");
+    throw new ApiError(400, "Ảnh sau khi xử lý phải không quá 300 KB");
   }
   const valid =
     (extension === ".jpg" &&
@@ -764,9 +764,6 @@ function decodeBase64Image(dataUrl) {
 
 async function apiItemImage(request, env, method, itemId) {
   const user = await requireUser(request, env, ["admin", "keeper"]);
-  if (!env.IMAGES) {
-    throw new ApiError(503, "Kho ảnh R2 chưa được cấu hình");
-  }
   const item = await dbFirst(
     env.DB,
     "SELECT id,code,image_file FROM items WHERE id=?",
@@ -782,29 +779,36 @@ async function apiItemImage(request, env, method, itemId) {
       .randomUUID()
       .replaceAll("-", "")
       .slice(0, 12)}${image.extension}`;
-    await env.IMAGES.put(filename, image.bytes, {
-      httpMetadata: { contentType: image.mime },
-      customMetadata: { itemId, itemCode: item.code },
-    });
-    try {
-      await env.DB.batch([
-        env.DB.prepare(
-          "UPDATE items SET image_file=?,updated_at=? WHERE id=?",
-        ).bind(filename, nowIso(), itemId),
-        auditStatement(
-          env.DB,
-          user,
-          "UPLOAD_IMAGE",
-          "item",
-          itemId,
-          item.code,
-        ),
-      ]);
-    } catch (error) {
-      await env.IMAGES.delete(filename);
-      throw error;
-    }
-    if (oldFile && oldFile !== filename) await env.IMAGES.delete(oldFile);
+    const when = nowIso();
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO item_images(" +
+          "image_key,item_id,mime_type,image_data,size_bytes,updated_at" +
+          ") VALUES(?,?,?,?,?,?) " +
+          "ON CONFLICT(item_id) DO UPDATE SET " +
+          "image_key=excluded.image_key,mime_type=excluded.mime_type," +
+          "image_data=excluded.image_data,size_bytes=excluded.size_bytes," +
+          "updated_at=excluded.updated_at",
+      ).bind(
+        filename,
+        itemId,
+        image.mime,
+        image.bytes,
+        image.bytes.byteLength,
+        when,
+      ),
+      env.DB.prepare(
+        "UPDATE items SET image_file=?,updated_at=? WHERE id=?",
+      ).bind(filename, when, itemId),
+      auditStatement(
+        env.DB,
+        user,
+        "UPLOAD_IMAGE",
+        "item",
+        itemId,
+        `${item.code}; bytes=${image.bytes.byteLength}`,
+      ),
+    ]);
     return jsonResponse({
       ok: true,
       imageUrl: `/images/${encodeURIComponent(filename)}`,
@@ -813,6 +817,9 @@ async function apiItemImage(request, env, method, itemId) {
 
   if (method === "DELETE") {
     await env.DB.batch([
+      env.DB.prepare(
+        "DELETE FROM item_images WHERE item_id=? OR image_key=?",
+      ).bind(itemId, oldFile),
       env.DB.prepare(
         "UPDATE items SET image_file='',updated_at=? WHERE id=?",
       ).bind(nowIso(), itemId),
@@ -825,7 +832,6 @@ async function apiItemImage(request, env, method, itemId) {
         item.code,
       ),
     ]);
-    if (oldFile) await env.IMAGES.delete(oldFile);
     return jsonResponse({ ok: true });
   }
   throw new ApiError(405, "Phương thức không được hỗ trợ");
@@ -1493,6 +1499,19 @@ async function apiRestore(request, env) {
       `items=${data.items.length}; vouchers=${data.vouchers.length}`,
     ),
   ]);
+  await env.DB.batch([
+    env.DB.prepare(
+      "DELETE FROM item_images WHERE item_id NOT IN (SELECT id FROM items)",
+    ),
+    env.DB.prepare(
+      "UPDATE items SET image_file='' " +
+        "WHERE image_file<>'' AND NOT EXISTS (" +
+        "SELECT 1 FROM item_images " +
+        "WHERE item_images.item_id=items.id " +
+        "AND item_images.image_key=items.image_file" +
+        ")",
+    ),
+  ]);
   return jsonResponse({ ok: true });
 }
 
@@ -1501,7 +1520,6 @@ async function handleImageRequest(request, env, url) {
     throw new ApiError(405, "Phương thức không được hỗ trợ");
   }
   await requireUser(request, env);
-  if (!env.IMAGES) throw new ApiError(503, "Kho ảnh R2 chưa được cấu hình");
   let filename;
   try {
     filename = decodeURIComponent(url.pathname.slice("/images/".length)).trim();
@@ -1517,25 +1535,42 @@ async function handleImageRequest(request, env, url) {
   ) {
     throw new ApiError(400, "Tên ảnh không hợp lệ");
   }
-  const object = await env.IMAGES.get(filename);
-  if (!object) throw new ApiError(404, "Không tìm thấy ảnh");
-  if (request.headers.get("If-None-Match") === object.httpEtag) {
-    const headers = new Headers({ ETag: object.httpEtag });
+  const image = await dbFirst(
+    env.DB,
+    "SELECT mime_type,image_data,size_bytes,updated_at " +
+      "FROM item_images WHERE image_key=?",
+    filename,
+  );
+  if (!image) throw new ApiError(404, "Không tìm thấy ảnh");
+  const bytes =
+    image.image_data instanceof Uint8Array
+      ? image.image_data
+      : image.image_data instanceof ArrayBuffer
+        ? new Uint8Array(image.image_data)
+        : ArrayBuffer.isView(image.image_data)
+          ? new Uint8Array(
+              image.image_data.buffer,
+              image.image_data.byteOffset,
+              image.image_data.byteLength,
+            )
+          : Uint8Array.from(image.image_data ?? []);
+  if (!bytes.length || bytes.byteLength > MAX_IMAGE_BYTES) {
+    throw new ApiError(500, "Dữ liệu ảnh trong D1 không hợp lệ");
+  }
+  const etag = `"${String(image.updated_at)
+    .replace(/\D/g, "")
+    .slice(0, 20)}-${bytes.byteLength}"`;
+  if (request.headers.get("If-None-Match") === etag) {
+    const headers = new Headers({ ETag: etag });
     applySecurityHeaders(headers, "private, max-age=86400");
     return new Response(null, { status: 304, headers });
   }
   const headers = new Headers();
-  object.writeHttpMetadata?.(headers);
-  headers.set(
-    "Content-Type",
-    headers.get("Content-Type") ||
-      object.httpMetadata?.contentType ||
-      "application/octet-stream",
-  );
-  headers.set("ETag", object.httpEtag);
-  headers.set("Content-Length", String(object.size));
+  headers.set("Content-Type", image.mime_type || "application/octet-stream");
+  headers.set("ETag", etag);
+  headers.set("Content-Length", String(bytes.byteLength));
   applySecurityHeaders(headers, "private, max-age=86400");
-  return new Response(request.method === "HEAD" ? null : object.body, {
+  return new Response(request.method === "HEAD" ? null : bytes, {
     status: 200,
     headers,
   });

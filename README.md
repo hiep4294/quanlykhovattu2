@@ -1,13 +1,15 @@
-# Quản lý kho nội bộ KODSDOOR V5.8.1 — Cloudflare
+# Quản lý kho nội bộ KODSDOOR V5.8.2 — Cloudflare D1
 
 Bản này giữ nguyên giao diện và nghiệp vụ của phần mềm trong file
 `Phan_mem_quan_ly_kho_noi_bo_KODSDOOR_V5_8_1_CO_KEO_COT_HANG_KHI_IN.zip`.
 Chỉ thay máy chủ Python/SQLite cục bộ bằng:
 
 - Cloudflare Worker: API và xác thực.
-- Cloudflare D1: dữ liệu kho dùng chung.
-- Cloudflare R2: ảnh vật tư.
+- Cloudflare D1: dữ liệu kho dùng chung và ảnh vật tư đã nén.
 - Workers Static Assets: giao diện HTML/CSS/JS gốc.
+
+Bản V5.8.2 không dùng R2, vì vậy tài khoản Cloudflare miễn phí không cần kích
+hoạt R2 hoặc thêm thẻ thanh toán.
 
 ## Chức năng được giữ nguyên
 
@@ -28,16 +30,17 @@ Trong repository, mở **Settings → Secrets and variables → Actions** và t�
 | Secret | Nội dung |
 |---|---|
 | `CLOUDFLARE_ACCOUNT_ID` | Account ID của Cloudflare |
-| `CLOUDFLARE_API_TOKEN` | API token có quyền Workers, D1 và R2 |
+| `CLOUDFLARE_API_TOKEN` | API token có quyền Workers và D1 |
 | `ADMIN_PASSWORD` | Mật khẩu ban đầu cho tài khoản `admin` |
 | `KEEPER_PASSWORD` | Mật khẩu ban đầu cho tài khoản `thukho` |
 | `VIEWER_PASSWORD` | Mật khẩu ban đầu cho tài khoản `xem` |
 
 Sau đó vào **Actions → Deploy Cloudflare Worker → Run workflow**.
-Wrangler tự tạo D1 và R2 ở lần triển khai đầu, áp dụng migration rồi xuất bản
-Worker. Không cần điền thủ công `database_id` hoặc `bucket_name`.
+Wrangler tự tạo D1 ở lần triển khai đầu, áp dụng migration rồi xuất bản Worker.
+Không cần điền thủ công `database_id` và không cần tạo R2 Bucket.
 
 Không ghi API token hoặc mật khẩu trực tiếp vào repository.
+Nếu đang nâng cấp từ bản R2 bị lỗi, xem `CAP_NHAT_KHONG_R2.md`.
 
 ## Chạy và kiểm tra cục bộ
 
@@ -56,13 +59,18 @@ npm test
 
 Tài liệu tham chiếu:
 
-- [Cloudflare tự động tạo D1/R2 từ binding](https://developers.cloudflare.com/changelog/post/2025-10-24-automatic-resource-provisioning/)
+- [Cloudflare tự động tạo tài nguyên từ binding](https://developers.cloudflare.com/changelog/post/2025-10-24-automatic-resource-provisioning/)
 - [Cloudflare Workers với GitHub Actions](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/)
 - [Lệnh migration D1](https://developers.cloudflare.com/d1/wrangler-commands/)
+- [Giới hạn D1](https://developers.cloudflare.com/d1/platform/limits/)
 
 ## Lưu ý vận hành
 
 - Đổi mật khẩu mặc định ngay sau lần đăng nhập đầu.
 - Tải file **Sao lưu** định kỳ.
-- Ảnh vật tư nằm trong R2; file sao lưu JSON chỉ chứa tên ảnh giống bản gốc,
-  không chứa dữ liệu nhị phân của ảnh.
+- Trình duyệt tự nén ảnh thành WebP tối đa 300 KB rồi lưu trong bảng riêng của
+  D1; giao diện tải/xem/xóa ảnh giữ nguyên.
+- File sao lưu JSON không chứa dữ liệu nhị phân của ảnh. Khi phục hồi trên cùng
+  cơ sở dữ liệu, ảnh của các vật tư có cùng mã nội bộ vẫn được giữ lại.
+- D1 miễn phí có giới hạn 500 MB. Nên chỉ dùng ảnh minh họa cần thiết và xóa ảnh
+  cũ không còn sử dụng.

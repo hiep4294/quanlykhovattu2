@@ -73,42 +73,6 @@ class D1Mock {
 }
 
 
-class R2Mock {
-  constructor() {
-    this.objects = new Map();
-  }
-
-  async put(key, value, options = {}) {
-    const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
-    this.objects.set(key, {
-      bytes: Uint8Array.from(bytes),
-      httpMetadata: options.httpMetadata ?? {},
-    });
-  }
-
-  async get(key) {
-    const stored = this.objects.get(key);
-    if (!stored) return null;
-    const httpEtag = `"mock-${key}"`;
-    return {
-      body: stored.bytes,
-      size: stored.bytes.byteLength,
-      httpEtag,
-      httpMetadata: stored.httpMetadata,
-      writeHttpMetadata(headers) {
-        if (stored.httpMetadata.contentType) {
-          headers.set("Content-Type", stored.httpMetadata.contentType);
-        }
-      },
-    };
-  }
-
-  async delete(key) {
-    this.objects.delete(key);
-  }
-}
-
-
 function applyMigrations(db) {
   const directory = new URL("../migrations/", import.meta.url);
   for (const file of readdirSync(directory).filter((name) => name.endsWith(".sql")).sort()) {
@@ -122,7 +86,6 @@ function createEnvironment() {
   applyMigrations(DB);
   return {
     DB,
-    IMAGES: new R2Mock(),
     ASSETS: {
       fetch: async () =>
         new Response("<!doctype html><title>KODSDOOR</title>", {
@@ -318,6 +281,26 @@ test("full warehouse API keeps the original workflow and permissions", async () 
     json: { dataUrl: onePixelPng, filename: "test.png" },
   });
   assert.equal(upload.response.status, 200, JSON.stringify(upload.body));
+  const storedImage = env.DB.database
+    .prepare(
+      "SELECT item_id,mime_type,size_bytes,length(image_data) AS stored_bytes " +
+        "FROM item_images WHERE item_id=?",
+    )
+    .get(itemId);
+  assert.equal(storedImage.item_id, itemId);
+  assert.equal(storedImage.mime_type, "image/png");
+  assert.equal(storedImage.size_bytes, storedImage.stored_bytes);
+  assert.ok(storedImage.size_bytes > 0 && storedImage.size_bytes <= 300 * 1024);
+
+  const oversizedImage =
+    "data:image/webp;base64," +
+    Buffer.alloc(300 * 1024 + 1).toString("base64");
+  const rejectedImage = await request(env, `/api/items/${itemId}/image`, {
+    method: "POST",
+    cookie: adminCookie,
+    json: { dataUrl: oversizedImage, filename: "qua-lon.webp" },
+  });
+  assert.equal(rejectedImage.response.status, 400);
 
   const after = await request(env, "/api/snapshot", { cookie: adminCookie });
   const savedItem = after.body.data.items.find((row) => row.id === itemId);
@@ -363,6 +346,15 @@ test("full warehouse API keeps the original workflow and permissions", async () 
     json: { data: backup.body.data },
   });
   assert.equal(restored.response.status, 200, JSON.stringify(restored.body));
+  const afterRestore = await request(env, "/api/snapshot", { cookie: adminCookie });
+  const restoredItem = afterRestore.body.data.items.find((row) => row.id === itemId);
+  assert.match(restoredItem.imageUrl, /^\/images\//);
+  const restoredImage = await request(
+    env,
+    restoredItem.imageUrl.split("?")[0],
+    { cookie: adminCookie },
+  );
+  assert.equal(restoredImage.response.status, 200);
 
   const staticPage = await request(env, "/");
   assert.equal(staticPage.response.status, 200);

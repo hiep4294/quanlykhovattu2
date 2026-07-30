@@ -33,7 +33,7 @@ jobs:
       - name: Test
         run: npm test
 
-      # The first deploy automatically provisions the draft D1 and R2 bindings.
+      # Lần đầu triển khai, Wrangler tự tạo cơ sở dữ liệu D1 từ binding DB.
       - name: Provision resources
         uses: cloudflare/wrangler-action@v4
         with:
