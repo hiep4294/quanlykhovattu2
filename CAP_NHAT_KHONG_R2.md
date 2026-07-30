@@ -1,24 +1,24 @@
-# Cập nhật bản Cloudflare không dùng R2
+# Cập nhật V5.8.3: không R2 và không tạo trùng D1
 
-## Cách cập nhật repository GitHub
+## Thay thế mã trên GitHub
 
-1. Giải nén file ZIP này.
-2. Upload **toàn bộ nội dung bên trong** lên nhánh `main` của repository
-   `Quan_ly_kho_vat_tu2`, ghi đè các file cũ.
-3. Không xóa cơ sở dữ liệu D1 đã được Cloudflare tạo trước đó.
-4. Vào **GitHub → Actions → Deploy Cloudflare Worker → Run workflow**.
-5. Chờ bước `Test`, `Apply database migrations` và `Publish production version`
-   đều chuyển màu xanh.
+1. Giải nén ZIP.
+2. Upload toàn bộ **nội dung bên trong** lên nhánh `main`, ghi đè file cũ.
+3. Không xóa D1 `quanlykhovattu2-db`.
+4. Chọn một cách triển khai:
+   - GitHub Actions: chạy workflow `Deploy Cloudflare Worker`.
+   - Cloudflare Builds: đặt Deploy command là `npm run deploy:cloudflare`.
 
-## Kết quả
+Không chạy trực tiếp `npx wrangler deploy` cho lần cập nhật này.
 
-- Không tạo hoặc sử dụng R2 Bucket.
-- Không còn lỗi Cloudflare `Code 10042`.
-- Migration `0004_item_images_d1.sql` tự tạo bảng ảnh trong D1.
-- Dữ liệu vật tư, phiếu và đối tác đang có trong D1 được giữ nguyên.
-- Ảnh mới được trình duyệt nén WebP dưới 300 KB trước khi lưu.
+## Bản sửa xử lý hai lỗi
 
-## Nếu vẫn báo lỗi R2
+- Không còn binding R2 nên không gặp `Code 10042`.
+- Script tự tìm D1 đã có, lấy Database ID và triển khai với
+  `--no-x-provision`, nên không gặp `A database with that name already exists`.
 
-Repository vẫn còn file cũ. Kiểm tra `wrangler.jsonc`: file đúng chỉ có binding
-`DB`, không có mục `r2_buckets` hoặc binding `IMAGES`.
+## Dữ liệu
+
+- Giữ nguyên vật tư, phiếu, đối tác và người dùng trong D1 hiện tại.
+- Migration chỉ bổ sung bảng còn thiếu.
+- Ảnh mới được nén WebP tối đa 300 KB rồi lưu trong D1.

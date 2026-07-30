@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "quan-ly-kho-vat-tu2",
+  "name": "quanlykhovattu2",
   "main": "src/worker.js",
   "compatibility_date": "2026-07-30",
   "workers_dev": true,

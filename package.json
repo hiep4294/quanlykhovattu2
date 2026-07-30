@@ -1,15 +1,17 @@
 {
   "name": "kodsdoor-quan-ly-kho-cloudflare",
-  "version": "5.8.2",
+  "version": "5.8.3",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --local --persist-to .wrangler/state",
     "check": "node --check src/worker.js",
     "db:local": "wrangler d1 migrations apply DB --local --persist-to .wrangler/state",
-    "db:remote": "wrangler d1 migrations apply DB --remote",
+    "prepare:d1": "node scripts/prepare-d1-config.mjs",
+    "db:remote": "node scripts/apply-remote-migrations.mjs",
     "test": "npm run check && node --test tests/*.test.mjs",
-    "deploy": "npm test && wrangler deploy"
+    "deploy": "npm run deploy:cloudflare",
+    "deploy:cloudflare": "npm test && node scripts/deploy-cloudflare.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.26.0"

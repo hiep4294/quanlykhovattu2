@@ -33,38 +33,14 @@ jobs:
       - name: Test
         run: npm test
 
-      # Lần đầu triển khai, Wrangler tự tạo cơ sở dữ liệu D1 từ binding DB.
-      - name: Provision resources
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
-
-      - name: Apply database migrations and set login secrets
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 migrations apply DB --remote
-          secrets: |
-            ADMIN_PASSWORD
-            KEEPER_PASSWORD
-            VIEWER_PASSWORD
+      - name: Resolve D1, migrate and deploy
+        run: node scripts/deploy-cloudflare.mjs
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_DATABASE_NAME: quanlykhovattu2-db
+          D1_LOCATION: apac
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           KEEPER_PASSWORD: ${{ secrets.KEEPER_PASSWORD }}
           VIEWER_PASSWORD: ${{ secrets.VIEWER_PASSWORD }}
-
-      - name: Publish production version
-        id: deploy
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
-
-      - name: Deployment URL
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
-        run: test -n "$DEPLOYMENT_URL" && echo "$DEPLOYMENT_URL"
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
